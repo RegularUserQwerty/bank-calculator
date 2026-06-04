@@ -6,6 +6,8 @@
 
 <a href="/calculator" class="btn btn-primary">Калькулятор</a>
 <a href="/history" class="btn btn-secondary">История</a>
+<a href="/admin/calculators"
+  class="btn btn-success">Калькуляторы</a>
 
 <hr>
 

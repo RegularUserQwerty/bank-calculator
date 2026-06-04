@@ -20,11 +20,41 @@
     					<label class="form-label">Тип кредита</label>
 
     					<select name="loan_type" class="form-control" required>
-        				<option value="mortgage">Ипотека</option>
-        				<option value="auto">Автокредит</option>
-        				<option value="consumer">Потребительский</option>
-    					</select>
+
+    						@foreach($calculators as $calculator)
+
+        				<option value="{{ $calculator->code }}">
+            		{{ $calculator->name }}
+        				</option>
+
+    						@endforeach
+
+							</select>
+
+						<div id="pension-fields" style="display:none;">
+								<div class="mb-3">
+    							<label>Текущий возраст</label>
+    							<input type="number" name="current_age" class="form-control">
+								</div>
+
+								<div class="mb-3">
+									<label>Возраст выхода на пенсию</label>
+									<input type="number" name="retirement_age" class="form-control">
+								</div>
+
+								<div class="mb-3">
+									<label>Текущие накопления</label>
+									<input type="number" name="pension_start" class="form-control">
+								</div>
+
+								<div class="mb-3">
+									<label>Ежемесячный взнос</label>
+									<input type="number" name="monthly_contribution" class="form-control">
+								</div>
+							</div>
+
 						</div>
+					<div id="credit-fields">	
             <!-- стоимость -->
             <div class="mb-3">
                 <label class="form-label" id="price-label">
@@ -71,7 +101,7 @@
                        class="form-control"
                        required>
             </div>
-
+					</div>
             <!-- кнопка -->
             <button type="submit"
                     class="btn btn-primary">
@@ -85,47 +115,58 @@
 
 <!-- скрипт для динамического изменения текста -->
 <script>
-    const loanType = document.querySelector('select[name="loan_type"]');
-    const label = document.querySelector('#price-label');
+const loanType = document.querySelector('select[name="loan_type"]');
 
-    function updateLabel() {
-        const value = loanType.value;
+const label = document.querySelector('#price-label');
+const creditFields = document.querySelector('#credit-fields');
+const pensionFields = document.querySelector('#pension-fields');
+const downBlock = document.querySelector('#down-block');
 
-        if (value === 'mortgage') {
-            label.innerText = 'Стоимость недвижимости';
-        } 
-        else if (value === 'auto') {
-            label.innerText = 'Стоимость автомобиля';
-        } 
-        else {
-            label.innerText = 'Сумма кредита';
-        }
+function updateUI() {
+    const value = loanType.value;
+
+    //  текст
+    if (value === 'mortgage') {
+        label.innerText = 'Стоимость недвижимости';
+    } else if (value === 'auto') {
+        label.innerText = 'Стоимость автомобиля';
+    } else {
+        label.innerText = 'Сумма кредита';
     }
 
-    // при изменении select
-    loanType.addEventListener('change', updateLabel);
+    //  переключение режимов
+    if (value === 'pension') {
+        creditFields.style.display = 'none';
+        pensionFields.style.display = 'block';
+    } else {
+        creditFields.style.display = 'block';
+        pensionFields.style.display = 'none';
+    }
 
-    // при загрузке страницы
-    updateLabel();
-
-		// блок первоначального взноса
-		const downBlock = document.querySelector('#down-block');
-
-		function updateDownPayment() {
-    	const value = loanType.value;
-
-    	if (value === 'mortgage') {
+    //  первоначальный взнос только для ипотеки
+    if (value === 'mortgage') {
         downBlock.style.display = 'block';
-    	} else {
+    } else {
         downBlock.style.display = 'none';
-    	}
+    }
+		if (value === 'pension') {
+    		creditFields.style.display = 'none';
+    		pensionFields.style.display = 'block';
+
+    		creditFields.querySelectorAll('input').forEach(i => i.disabled = true);
+    		pensionFields.querySelectorAll('input').forEach(i => i.disabled = false);
+
+		} else {
+    		creditFields.style.display = 'block';
+    		pensionFields.style.display = 'none';
+
+    		creditFields.querySelectorAll('input').forEach(i => i.disabled = false);
+    		pensionFields.querySelectorAll('input').forEach(i => i.disabled = true);
+}
 }
 
-// при изменении
-loanType.addEventListener('change', updateDownPayment);
-
-// при загрузке
-updateDownPayment();
+loanType.addEventListener('change', updateUI);
+updateUI();
 </script>
 
 @endsection

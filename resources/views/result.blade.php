@@ -7,16 +7,46 @@
 
         <h2 class="mb-4">Результат расчёта</h2>
 
-        <p><b>Тип кредита:</b> {{ $type }}</p>
-        <p><b>Сумма кредита:</b> {{ $loan }}</p>
-        <p><b>Ставка:</b> {{ $rate }}%</p>
+        <p><b>Тип:</b> {{ $type }}</p>
 
-        <hr>
+        @if($type === 'Пенсионные накопления')
 
-        <h3>Ежемесячный платёж:</h3>
-        <h1 class="text-success">{{ $payment }} руб</h1>
+            <p><b>Итоговый капитал:</b> {{ $totalCapital }} руб.</p>
+            <p><b>Пенсия в месяц:</b> {{ $monthlyPayment }} руб.</p>
 
-        <p>Срок: {{ $years }} лет</p>
+        @else
+
+            <p><b>Сумма кредита:</b> {{ number_format($loan, 0, ',', ' ') }} руб.</p>
+
+            <p><b>Ставка:</b> {{ $rate }}%</p>
+
+            <hr>
+
+            <h3>{{ $resultText ?? 'Ежемесячный платёж' }}:</h3>
+
+            <h1 class="text-success">
+                {{ number_format($payment, 0, ',', ' ') }} руб.
+            </h1>
+
+            <p><b>Срок кредита:</b> {{ $years }} лет</p>
+
+            <p>
+                <b>Общая сумма выплат:</b>
+                {{ number_format($totalPayment, 0, ',', ' ') }} руб.
+            </p>
+
+            <p>
+                <b>Переплата по кредиту:</b>
+                {{ number_format($overpayment, 0, ',', ' ') }} руб.
+            </p>
+
+            {{-- Необходимый доход из ТЗ --}}
+            <p>
+                <b>Необходимый доход:</b>
+                {{ number_format(round($payment * 2.5), 0, ',', ' ') }} руб.
+            </p>
+
+        @endif
 
         <hr>
 

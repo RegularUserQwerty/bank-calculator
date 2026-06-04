@@ -1,138 +1,192 @@
 <?php
 
-use Illuminate\Support\Facades\Mail;
-
-use App\Mail\CalculationResultMail;
-
 use Illuminate\Support\Facades\Route;
-
+use Illuminate\Support\Facades\Mail;
 use App\Models\Calculation;
+use App\Mail\CalculationResultMail;
+use Illuminate\Http\Request;
+use App\Models\Calculator;
 
-Route::get('/history', function () {
-    $calculations = Calculation::orderBy('id', 'desc')->get();
+/*
+ ПЕРЕХОДЫ САЙТА
+*/
 
-    return view('history', compact('calculatioпогналиns'));
-});
-
+// главная
 Route::get('/', function () {
     return view('welcome');
 });
+
+// калькулятор
 Route::get('/calculator', function () {
-    return view('calculator');
-});
-use Illuminate\Http\Request;
 
-Route::get('/calculator', function () {
-    return view('calculator');
+    $calculators = Calculator::all();
+
+    return view('calculator', compact('calculators'));
 });
 
-Route::get('/delete/{id}', function ($id) {
-    App\Models\Calculation::findOrFail($id)->delete();
-   // возвращаемся назад (откуда пришли)
-    return redirect()->back()->with('success', 'Удалено');
-});
+// история (только админ)
+Route::get('/history', function () {
 
-Route::post('/calculator', function () {
-
-    // тип кредита из формы
-    $type = request('loan_type');
-
-    // ставка по типу кредита
-    if ($type == 'mortgage') {
-        $rate = 9.6; // ипотека
-    } elseif ($type == 'auto') {
-        $rate = 3.5; // автокредит
-    } else {
-        $rate = 14.5; // потребительский
-    }
-
-    // входные данные
-    $price = request('price');
-    $down = request('down_payment');
-    $years = request('years');
-
-    // сумма кредита
-    if ($type == 'mortgage') {
-    // ипотека — учитываем взнос
-    $loan = $price - $down;
-} else {
-    // авто и потребительский - без взноса
-    $loan = $price;
-}
-
-    // месячная ставка
-    $monthlyRate = $rate / 12 / 100;
-
-    // формула сложного процента
-    $totalRate = pow(1 + $monthlyRate, $years * 12);
-
-    $monthlyPayment = $loan * $monthlyRate * $totalRate / ($totalRate - 1);
-
-    // сохраняем в базу
-    App\Models\Calculation::create([
-        'price' => $price,
-        'down_payment' => $down,
-        'years' => $years,
-        'monthly_payment' => round($monthlyPayment),
-        'email' => request('email')
-    ]);
-
-		// отправка email пользователю
-		Mail::to(request('email'))
-    	->send(new CalculationResultMail(
-        round($monthlyPayment), // платёж
-        $years,                 // срок
-        $type,                  // тип кредита
-        $rate                   // ставка
-    ));
-
-		// перевод типа кредита на русский
-		$typeLabel = match ($type) {
-    'mortgage' => 'Ипотека',
-    'auto' => 'Автокредит',
-    'consumer' => 'Потребительский кредит',
-};
-
-    // вывод результата
-    return view('result', [
-    'payment' => round($monthlyPayment),
-    'years' => $years,
-    'type' => $typeLabel,
-    'rate' => $rate,
-    'loan' => $loan
-]);
-});
-
-Route::get('/admin', function () {
-
-    // если не залогинен - кидаем на логин
     if (!session('admin')) {
         return redirect('/admin/login');
     }
 
-    $calculations = App\Models\Calculation::all();
+    $calculations = Calculation::orderBy('id', 'desc')->get();
 
-    return view('admin', compact('calculations'));
+    return view('history', compact('calculations'));
 });
 
-// форма логина
+// удаление расчёта (только админ)
+Route::get('/delete/{id}', function ($id) {
+
+    if (!session('admin')) {
+        return redirect('/admin/login');
+    }
+
+    Calculation::findOrFail($id)->delete();
+
+    return redirect()->back()->with('success', 'Удалено');
+});
+
+/*
+РАСЧЁТ КАЛЬКУЛЯТОРА
+*/
+
+Route::post('/calculator', function () {
+
+    $type = request('loan_type');
+
+    /*
+     ПЕНСИОННЫЙ КАЛЬКУЛЯТОР (ОТДЕЛЬНАЯ ЛОГИКА)
+    */
+
+    if ($type === 'pension') {
+
+				$calculator = Calculator::where('code', 'pension')->first();
+        $currentAge = request('current_age');
+        $retirementAge = request('retirement_age');
+        $start = request('pension_start');
+        $monthly = request('monthly_contribution');
+
+        // параметры модели
+        $income = 0.08;
+        $inflation = 0.04;
+
+        $r = $income - $inflation;
+        $n = $retirementAge - $currentAge;
+
+        $S = $start;
+
+        for ($i = 0; $i < $n; $i++) {
+            $S = ($S * (1 + $r)) + (($monthly * 12) * (1 + $r));
+        }
+
+        $monthlyPension = $S / 270;
+
+        return view('result', [
+					'type' => $calculator->name ?? 'Пенсионные накопления',
+					'monthlyPayment' => round($monthlyPension),
+					'totalCapital' => round($S),
+					'resultText' => $calculator->result_text ?? 'Результат',
+				]);
+    }
+
+    /*
+     КРЕДИТНАЯ ЧАСТЬ
+    */
+
+$calculator = Calculator::where('code', $type)->first();
+
+if (!$calculator) {
+    return back()->with('error', 'Калькулятор не найден');
+}
+
+$rate = $calculator->rate;
+
+    $price = request('price');
+    $down = request('down_payment') ?? 0;
+    $years = request('years');
+
+    // сумма кредита
+    $loan = ($type === 'mortgage')
+        ? ($price - $down)
+        : $price;
+
+    // расчёт кредита
+    $monthlyRate = $rate / 12 / 100;
+    $totalRate = pow(1 + $monthlyRate, $years * 12);
+
+    $monthlyPayment = $loan * $monthlyRate * $totalRate / ($totalRate - 1);
+
+    $totalPayment = round($monthlyPayment * $years * 12);
+    $overpayment = round($totalPayment - $loan);
+
+    // сохраняем
+    Calculation::create([
+        'price' => $price,
+        'down_payment' => $down,
+        'years' => $years,
+        'monthly_payment' => round($monthlyPayment),
+        'email' => request('email'),
+    ]);
+
+    // email
+    Mail::to(request('email'))
+        ->send(new CalculationResultMail(
+            round($monthlyPayment),
+            $years,
+            $type,
+            $rate
+        ));
+
+    // русский текст
+$typeLabel = $calculator->name;
+
+    // результат
+    return view('result', [
+        'type' => $typeLabel,
+        'payment' => round($monthlyPayment),
+        'years' => $years,
+        'rate' => $rate,
+        'loan' => $loan,
+        'totalPayment' => $totalPayment,
+        'overpayment' => $overpayment,
+				'resultText' => $calculator->result_text,
+    ]);
+});
+
+/*
+АДМИНКА
+*/
+
+// вход
 Route::get('/admin/login', function () {
     return view('admin_login');
 });
 
-// обработка логина
 Route::post('/admin/login', function () {
 
     $login = request('login');
     $password = request('password');
 
-    //проверка 
     if ($login === 'admin' && $password === '1234') {
-        session(['admin' => true]); // сохраняем вход
+        session(['admin' => true]);
         return redirect('/admin');
     }
 
     return back()->with('error', 'Неверный логин или пароль');
+});
+
+// админ панель
+Route::get('/admin', function () {
+
+    if (!session('admin')) {
+        return redirect('/admin/login');
+    }
+
+    $calculations = Calculation::all();
+
+    return view('admin', compact('calculations'));
 });
 
 // выход
@@ -141,13 +195,65 @@ Route::get('/admin/logout', function () {
     return redirect('/admin/login');
 });
 
-Route::get('/delete/{id}', function ($id) {
+Route::get('/admin/calculators', function () {
 
     if (!session('admin')) {
         return redirect('/admin/login');
     }
 
-    App\Models\Calculation::findOrFail($id)->delete();
+    $calculators = Calculator::all();
 
-    return redirect()->back()->with('success', 'Удалено');
+    return view('calculators', compact('calculators'));
+});
+
+Route::get('/admin/calculators/delete/{id}', function ($id) {
+
+    if (!session('admin')) {
+        return redirect('/admin/login');
+    }
+
+    Calculator::findOrFail($id)->delete();
+
+    return redirect('/admin/calculators');
+});
+
+Route::get('/admin/calculators/edit/{id}', function ($id) {
+
+    if (!session('admin')) {
+        return redirect('/admin/login');
+    }
+
+    $calculator = Calculator::findOrFail($id);
+
+    return view('calculator_edit', compact('calculator'));
+});
+
+Route::post('/admin/calculators/edit/{id}', function ($id) {
+
+    $calculator = Calculator::findOrFail($id);
+
+    $calculator->update([
+        'name' => request('name'),
+        'rate' => request('rate'),
+        'result_text' => request('result_text')
+    ]);
+
+    return redirect('/admin/calculators');
+});
+
+Route::get('/admin/calculators/create', function () {
+
+    return view('calculator_create');
+});
+
+Route::post('/admin/calculators/create', function () {
+
+    Calculator::create([
+        'name' => request('name'),
+        'code' => request('code'),
+        'rate' => request('rate'),
+        'result_text' => request('result_text')
+    ]);
+
+    return redirect('/admin/calculators');
 });

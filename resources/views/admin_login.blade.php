@@ -13,17 +13,17 @@
             </div>
         @endif
 
-        <form method="POST" action="/admin/login">
+        <form method="POST" action="/admin/login" autocomplete="off">
             @csrf
 
             <div class="mb-3">
                 <label>Логин</label>
-                <input type="text" name="login" class="form-control" required>
+                <input type="text" name="login" class="form-control" autocomplete="off">
             </div>
 
             <div class="mb-3">
                 <label>Пароль</label>
-                <input type="password" name="password" class="form-control" required>
+                <input type="password" name="password" class="form-control" autocomplete="new-password">
             </div>
 
             <button class="btn btn-primary w-100">
