@@ -88,6 +88,7 @@ Route::post('/calculator', function () {
 					'monthlyPayment' => round($monthlyPension),
 					'totalCapital' => round($S),
 					'resultText' => $calculator->result_text ?? 'Результат',
+					'isPension' => true,
 				]);
     }
 

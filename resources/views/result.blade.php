@@ -9,7 +9,7 @@
 
         <p><b>Тип:</b> {{ $type }}</p>
 
-        @if($type === 'Пенсионные накопления')
+       	@if(isset($isPension))
 
             <p><b>Итоговый капитал:</b> {{ $totalCapital }} руб.</p>
             <p><b>Пенсия в месяц:</b> {{ $monthlyPayment }} руб.</p>
